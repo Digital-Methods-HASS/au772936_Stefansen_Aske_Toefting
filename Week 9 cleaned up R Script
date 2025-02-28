@@ -13,3 +13,17 @@ median(rooms, na.rm=TRUE)
 # Task 4
 read_csv("data/SAFI_clean.csv")
 interviews <- read_csv("data/SAFI_clean.csv")
+
+# Task 5
+data <- read_csv("data/Kongeraekken.csv")
+kongeraekke <- read_csv("data/Kongeraekken.csv")
+kongeraekke
+
+# Calculate reign durations
+reign_durations <- data$reg_slut - data$reg_start
+
+# result
+median(reign_durations, na.rm = TRUE)
+  Answer = 17
+mean(reign_durations, na.rm = TRUE)
+  Answer = 20.30189
