@@ -1,0 +1,256 @@
+---
+title: "Sentiment Towards Slavery Exam"
+author: "Aske Toefting Stefansen, Cecilie Qiu Barrett and Jacob Frederik Van Dassen Loefting"
+date: "`r Sys.time()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Using the correct libraries
+
+To make this R-project we have used Max Odsbjergs tutorial on how to import articles about the danish constitution as a template for our work. We have, of course, rewritten most of it so it fits our project, but we would like to give credit to Max for his work.
+
+It's important to use the right packages to make sure we are using the right tools for the work we are going to do. Here we have each package listed:
+
+Documentation for each package: <br>
+*https://www.tidyverse.org/packages/ <br>
+*https://cran.r-project.org/web/packages/tidytext/vignettes/tidytext.html <br>
+*https://lubridate.tidyverse.org/ <br>
+*https://ggplot2.tidyverse.org/ <br>
+*https://cran.r-project.org/web/packages/ggwordcloud/vignettes/ggwordcloud.html <br>
+*https://github.com/Guscode/Sentida/blob/master/README.md <br>
+
+Additional information about R: 
+https://www.r-project.org/
+
+```{r, message=FALSE}
+# Installing Sentida to make a sentiment analysis of the newspaper articles 
+
+library(tidyverse)
+library(tidytext)
+library(ggwordcloud)
+library(urltools)
+library(Sentida)
+```
+# Loading the data from the newspaper articles from 1700-1850
+```{r}
+link <- "http://labs.statsbiblioteket.dk/labsapi/api/aviser/export/fields?query=%28slave%2A%20OR%20nege%2A%29%20AND%20afskaf%2A%20py%3A%5B1700%20TO%201850%5D&fields=link&fields=recordID&fields=timestamp&fields=pwa&fields=cer&fields=fulltext_org&fields=pageUUID&fields=editionUUID&fields=titleUUID&fields=editionId&fields=familyId&fields=newspaper_page&fields=newspaper_edition&fields=lplace&fields=location_name&fields=location_coordinates&max=-1&structure=header&structure=content&format=CSV"
+```
+
+We have now stored the URL as a link in R. 
+We now use the code url_decode to make the link more readable:
+
+```{r}
+url_decode(link)
+```
+
+Now we will load the data into R 
+
+```{r}
+Slavery <- read_csv(link)
+```
+The data we now have named "Slavery" gave us 1113 hits 
+
+# Analysing the data 
+
+In the data we have different metadata such as the location of publication. 
+We will now analyse the data so we can get an overview of the location of publication:
+
+```{r}
+Slavery %>% 
+  count(lplace, sort = TRUE)
+```
+
+We will now use textmining to take the text and break it into individual words to be able to count the most frequent words used and call this Slavery_tidy:
+
+```{r}
+Slavery_tidy <- Slavery %>% 
+  unnest_tokens(word, fulltext_org)
+```
+
+Counting the most frequent words:
+
+```{r}
+Slavery_tidy %>% 
+  count(word, sort = TRUE)
+```
+# Using a stopword-list
+
+Our papers are written in old Danish so there probably serveral OCR-misreadings. We have received a 1800s stopword list from Max Odsbjerg. We can now load the list into R:
+
+```{r}
+stopord_1800 <- read_csv("https://gist.githubusercontent.com/maxodsbjerg/1537cf14c3d46b3d30caa5d99f8758e9/raw/9f044a38505334f035be111c9a3f654a24418f6d/stopord_18_clean.csv")
+```
+
+
+We can use the "anti_join" function before the "count" function to sort out the stop words:
+```{r}
+Slavery_tidy %>% 
+  anti_join(stopord_1800) %>% 
+    anti_join(stop_words) %>% 
+  count(word, sort = TRUE)
+```
+# Getting the desired results:
+
+Now we will make R read the words "slave" og "nege" into context. We will now make R read the 60 words before and after the words occur:
+```{r}
+Slavery_context <- Slavery %>% 
+  mutate(
+    context = str_extract(fulltext_org, regex(".{0,60}slave.{0,60}|.{0,60}nege.{0,60}", ignore_case = TRUE))
+  )
+
+```
+We are aware that we get some NA values in our coding but we don't think that it is enough to affect the outcome of the research as it is a very low amount. 
+
+```{r}
+Slavery_Sentida<- Slavery_context %>% 
+  rowwise() %>% 
+  mutate(
+    sentida_score = if (!is.na(context) && nchar(context) > 0) {
+      sentida(context)
+    } else {
+      NA
+    }
+  ) %>%
+  ungroup() %>%
+  select(-fulltext_org)
+```
+We found out that Windows computers have a hard time working with the coding probably because of issues with danish characters and mac does not, as the problem came in row 58 due to the word "ånd". We tried the exact same coding on a Mac computer, and it worked instantly. So we recommend using MacOS to get the same resultss.
+
+
+Here we looked into specific words related to slavery and which Sentida value they got
+```{r}
+sentida("Slave", output="total")
+```
+
+
+```{r}
+sentida("slaveri", output = "mean")
+```
+
+
+```{r}
+sentida("afskaffelse", output = "mean")
+```
+
+
+```{r}
+sentida("slavehandel", output="mean")
+```
+
+
+```{r}x
+sentida("Slave", output="mean")
+```
+
+
+Here we counted the most frequent words and their sentida score 
+```{r}
+Slavery_tidy %>% 
+  count(word, sort = TRUE) %>% 
+  rowwise() %>% 
+  mutate(sentida_score = sentida(word, output = "total")) -> Slavery_sentida_score_word_level
+```
+
+
+The words with the highest Sentida value sorted by the highest score
+
+```{r}
+Slavery_sentida_score_word_level %>% 
+  arrange(desc(sentida_score))
+```
+The words with the most negative Sentida value sorted by the lowest score
+```{r}
+Slavery_sentida_score_word_level %>% 
+  arrange(sentida_score) %>% 
+  
+
+```
+
+This shows how many words have been assigned a given Sentida score sorted by the lowest value. 
+91,02% of the words have been assigned a Sentida 0 score.
+```{r}
+Slavery_sentida_score_word_level %>% 
+  count(sentida_score) 
+```
+
+Now we analyse and create a graph that shows the connotations of the words used in relation to slavery per year:
+
+```{r}
+Slavery_context %>% 
+
+  rowwise() %>% 
+
+  mutate(
+
+    sentida_score = if (!is.na(context) && nchar(context) > 0) {
+
+      sentida(context)
+
+    } else {
+
+      NA
+
+    }
+
+  ) %>%
+
+  ungroup() %>%
+
+  select(-fulltext_org) %>% 
+
+  drop_na(sentida_score) %>% 
+
+  mutate(year = year(timestamp)) %>% 
+
+  group_by(year) %>% 
+
+  summarise(mean_sentida = mean(sentida_score)) %>% 
+
+  ungroup() %>% 
+
+  ggplot(aes(x = year, y = mean_sentida)) +
+
+  geom_line()
+```
+
+Here, we will now add a graph that shows the trend of the sentiment between year 1700-1850 with colors
+
+The blue graph: shows the connotations of the words used in relation to slavery per year
+
+The red graph: the trend
+
+```{r}
+Slavery_context %>% 
+  rowwise() %>% 
+  mutate(
+    sentida_score = if (!is.na(context) && nchar(context) > 0) {
+      sentida(context)
+    } else {
+      NA
+    }
+  ) %>%
+  ungroup() %>%
+  select(-fulltext_org) %>% 
+  drop_na(sentida_score) %>% 
+  mutate(year = year(timestamp)) %>% 
+  group_by(year) %>% 
+  summarise(mean_sentida = mean(sentida_score)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = year, y = mean_sentida)) +
+  geom_line(color = "blue") +                           # Original line
+  geom_smooth(method = "loess", se = FALSE, color = "red") +  # Trend line
+  labs(title = "Sentiment Trend Over Time",
+       x = "Year",
+       y = "Mean Sentida Score") +
+  theme_minimal()
+```
